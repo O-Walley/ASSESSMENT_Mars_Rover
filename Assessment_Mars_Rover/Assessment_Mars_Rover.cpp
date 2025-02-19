@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <regex>
+#include <sstream>
+#include <ctype.h>
 
 using namespace std;
 
@@ -71,6 +74,38 @@ vector<position> move_robot(position start_pos, string operations) {
     return movement_log;
 }
 
+string get_valid_input(regex pattern) {
+
+    string val;
+
+    // Ask user for input until valid entry
+    while (true) {
+
+        getline(cin, val);
+
+        if (!regex_match(val, pattern))
+        {
+            cerr << "Invalid Input Format.\n" << endl;
+        }
+        else return val;
+    }
+}
+
+vector<string> split_string(string val, char delimiter) {
+
+    stringstream sstr(val);
+    string seg;
+    vector<string> seglist;
+
+    // Split given string into vector using delimiter
+    while (getline(sstr, seg, delimiter))
+    {
+        seglist.push_back(seg);
+    }
+
+    return seglist;
+}
+
 
 int main()
 {
@@ -80,39 +115,57 @@ int main()
     {
         // Get grid dimensions
         pair <int, int> grid_dim; // (X, Y)
+        string grid_str;
+        regex grid_pattern(R"(^([1-9]\d*|0),([1-9]\d*|0)$)");
 
-        cout << "Enter grid width: ";
-        cin >> grid_dim.first;
+        cout << "Enter grid dimensions in the following format 'width,height' (e.g. 10,16):" << endl;
+        
+        grid_str = get_valid_input(grid_pattern);
 
-        cout << "Enter grid height: ";
-        cin >> grid_dim.second;
+        // Split dimensions string into values using ',' delimiter
+        vector<string> dim_values = split_string(grid_str, ',');
+
+        grid_dim.first = stoi(dim_values[0]);
+        grid_dim.second = stoi(dim_values[1]);
 
         cout << "Grid dimensions are " << grid_dim.first << "x" << grid_dim.second << "\n" << endl;
 
 
 
-        // Get robot start position and operation string
+        // Get robot start position with validation
         position robot_1;
+        string robot_str;
+        regex pos_pattern(R"(^([1-9]\d*|0)-([1-9]\d*|0)-[NESW]$)");
+
+        cout << "Enter a starting grid position in the following format 'X-Y-HEADING'" << endl;
+        cout << "Heading must be either N, E, S, or W. (e.g. 2-3-N):" << endl;
+        
+        robot_str = get_valid_input(pos_pattern);
+
+        // Split start position string into values using '-' delimiter
+        vector<string> pos_values = split_string(robot_str, '-');
+
+        robot_1.x_pos = stoi(pos_values[0]);
+        robot_1.y_pos = stoi(pos_values[1]);
+        robot_1.heading = pos_values[2].c_str()[0];
+
+        cout << "Robot starts at coordinates " << robot_1.x_pos << "," << robot_1.y_pos << " heading " << robot_1.heading << "\n" << endl;
+
+
+
+        // Get operations string with validation
         string operations;
+        regex op_pattern(R"(^[LRM]+$)");
 
-        cout << "Enter robot start x: ";
-        cin >> robot_1.x_pos;
+        cout << "Enter robot operation string (R = turn right, L = Turn left, M = Move one step towards current heading): " << endl;
 
-        cout << "Enter robot start y: ";
-        cin >> robot_1.y_pos;
+        operations = get_valid_input(op_pattern);
 
-        cout << "Enter robot start heading: ";
-        cin >> robot_1.heading;
-
-        cout << "Enter robot operation string: ";
-        cin >> operations;
-
-        cout << "\nRobot starts at coordinates " << robot_1.x_pos << "," << robot_1.y_pos << " heading " << robot_1.heading << endl;
         cout << "Robot will perform the following operations: " << operations << endl;
 
 
 
-        // Retrieve the movement log
+        // Perform operations and retrieve the movement log
         vector<position> movement_log_1 = move_robot(robot_1, operations);
 
         // Get final position
