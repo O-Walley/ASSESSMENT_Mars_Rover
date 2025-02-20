@@ -13,7 +13,7 @@ struct position {
     char heading;
 };
 
-vector<position> move_robot(position start_pos, string operations) {
+vector<position> move_robot(position start_pos, string operations, pair <int, int> grid_dim, vector<pair <int, int>> obstacles) {
 
     position robot = start_pos;
     vector<position> movement_log;
@@ -24,7 +24,7 @@ vector<position> move_robot(position start_pos, string operations) {
 
     movement_log.push_back(robot);
 
-    // Loop through string of operations
+    // Loop through each char in string of operations
     for (char& op : operations) {
         
         if (op == 'M') // Move robot one step forwards
@@ -37,6 +37,36 @@ vector<position> move_robot(position start_pos, string operations) {
                 case 'W': robot.x_pos -= step_size; break; // West/Left   
             }
 
+            // Maintain robot within grid boundaries
+            if (robot.x_pos < 0 || robot.x_pos > grid_dim.first || robot.y_pos < 0 || robot.y_pos > grid_dim.second)
+            {
+                cout << "\n##### WARNING #####" << endl;
+                cout << "The operations given lead the robot to position: " << robot.x_pos << "," << robot.y_pos << " heading " << robot.heading << endl;
+                cout << "This is out of grid boundaries." << "\n" << endl;
+
+                robot.heading = 'O';
+                movement_log.push_back(robot);
+
+                return movement_log;
+            }
+            else if(!obstacles.empty()) // Check for collision with listed obstacles (e.g. other robots)
+            {
+                pair <int, int> coords (robot.x_pos, robot.y_pos);
+                auto it = find(obstacles.begin(), obstacles.end(), coords);
+
+                if (it != obstacles.end())
+                {
+                    cout << "\n##### WARNING #####" << endl;
+                    cout << "The operations given lead the robot to position: " << robot.x_pos << "," << robot.y_pos << " heading " << robot.heading << endl;
+                    cout << "This would result in a collision, as there is an obstacle listed at " << robot.x_pos << "," << robot.y_pos << "\n" << endl;
+
+                    robot.heading = 'X';
+                    movement_log.push_back(robot);
+
+                    return movement_log;
+                }
+            }
+
             cout << "Updated position: " << robot.x_pos << "," << robot.y_pos << " heading " << robot.heading << endl;
         }
         else // Rotate robot
@@ -44,24 +74,18 @@ vector<position> move_robot(position start_pos, string operations) {
             // Find index of current heading char in vector
             auto it = find(directions.begin(), directions.end(), robot.heading);
 
-            if (it != directions.end()) // Found char index
+            if (it != directions.end()) // Found char in vector
             {
                 int index = distance(directions.begin(), it);
 
-                //cout << "Index: " << index << endl;
-
-                //cout << "Currently heading: " << robot.heading << endl;
-
                 if (op == 'R') index = (index + 1) % directions.size(); // Right turn
-                else index = (index - 1 + directions.size()) % directions.size(); // Left turn
-
-                //cout << "Index: " << index << endl;
+                else index = (index - 1 + directions.size()) % directions.size(); // Left turn      
 
                 robot.heading = directions.at(index);
 
                 cout << "Updated heading: " << robot.heading << endl;
             }
-            else // Char not found in array (should not be possible)
+            else // Char not found in vector (should not be possible)
             {
                 cerr << "Direction char not found in array" << endl;
             }
@@ -113,6 +137,8 @@ int main()
 
     do
     {
+        vector<pair <int, int>> obstacles;
+
         // Get grid dimensions
         pair <int, int> grid_dim; // (X, Y)
         string grid_str;
@@ -130,54 +156,94 @@ int main()
 
         cout << "Grid dimensions are " << grid_dim.first << "x" << grid_dim.second << "\n" << endl;
 
-
-
-        // Get robot start position with validation
-        position robot_1;
-        string robot_str;
-        regex pos_pattern(R"(^([1-9]\d*|0)-([1-9]\d*|0)-[NESW]$)");
-
-        cout << "Enter a starting grid position in the following format 'X-Y-HEADING'" << endl;
-        cout << "Heading must be either N, E, S, or W. (e.g. 2-3-N):" << endl;
         
-        robot_str = get_valid_input(pos_pattern);
+        
+        int robot_count = 0;
 
-        // Split start position string into values using '-' delimiter
-        vector<string> pos_values = split_string(robot_str, '-');
+        while (robot_count < 2) // 2 Robots - Can be changed for more or less
+        {
 
-        robot_1.x_pos = stoi(pos_values[0]);
-        robot_1.y_pos = stoi(pos_values[1]);
-        robot_1.heading = pos_values[2].c_str()[0];
+            // Get robot start position with validation
+            position robot;
+            string robot_str;
+            regex pos_pattern(R"(^([1-9]\d*|0)-([1-9]\d*|0)-[NESW]$)");
+            vector<string> pos_values;
+            bool valid_pos = false;
 
-        cout << "Robot starts at coordinates " << robot_1.x_pos << "," << robot_1.y_pos << " heading " << robot_1.heading << "\n" << endl;
+            cout << "##### ROBOT " << robot_count << " #####" << endl;
+
+            cout << "Enter a starting grid position in the following format 'X-Y-HEADING'" << endl;
+            cout << "Heading must be either N, E, S, or W. (e.g. 2-3-N):" << endl;
+            
+            do
+            {
+                robot_str = get_valid_input(pos_pattern);
+
+                // Split start position string into values using '-' delimiter
+                pos_values = split_string(robot_str, '-');
+
+                // Check to see if attempting to start on obstacle
+                pair <int, int> coords(stoi(pos_values[0]), stoi(pos_values[1]));
+                auto it = find(obstacles.begin(), obstacles.end(), coords);
+
+                if (it != obstacles.end())
+                {
+                    cout << "\n##### WARNING #####" << endl;
+                    cout << "Obstacle listed at " << coords.first << "," << coords.second << endl;
+                    cout << "Choose an alternative start point. \n" << endl;
+                }
+                else valid_pos = true;
+            } 
+            while (!obstacles.empty() && !valid_pos);
 
 
 
-        // Get operations string with validation
-        string operations;
-        regex op_pattern(R"(^[LRM]+$)");
+            string operations;
+            regex op_pattern(R"(^[LRM]+$)");
 
-        cout << "Enter robot operation string (R = turn right, L = Turn left, M = Move one step towards current heading): " << endl;
+            do
+            {
+                // Initialise robot with start input
+                robot.x_pos = stoi(pos_values[0]);
+                robot.y_pos = stoi(pos_values[1]);
+                robot.heading = pos_values[2].c_str()[0];
 
-        operations = get_valid_input(op_pattern);
-
-        cout << "Robot will perform the following operations: " << operations << endl;
+                cout << "Robot " << robot_count << " starts at coordinates " << robot.x_pos << ", " << robot.y_pos << " heading " << robot.heading << "\n" << endl;
 
 
 
-        // Perform operations and retrieve the movement log
-        vector<position> movement_log_1 = move_robot(robot_1, operations);
+                // Get operations string with validation
+                cout << "Enter robot " << robot_count << " operation string (R = turn right, L = Turn left, M = Move one step towards current heading): " << endl;
 
-        // Get final position
-        robot_1 = movement_log_1.back();
+                operations = get_valid_input(op_pattern);
 
-        cout << "\nRobot ends at coordinates " << robot_1.x_pos << "," << robot_1.y_pos << " heading " << robot_1.heading << endl;
+                cout << "Robot " << robot_count << " will perform the following operations: " << operations << endl;
 
-        cout << "\nTry again? (y/n):" << endl;
+
+
+                // Perform operations and retrieve the movement log
+                vector<position> movement_log_1 = move_robot(robot, operations, grid_dim, obstacles);
+                
+                // Nothing is really done with the movement log here, but it could be useful for visualisations (e.g. showing the robot's path) or repeating operations 
+
+                // Get final position
+                robot = movement_log_1.back();
+
+            } while (robot.heading == 'O' || robot.heading == 'X'); // Ask for new operations in event of collision or out of bounds
+
+            // Add robot to list of obstacles once operations are completed
+            obstacles.push_back(pair <int, int>(robot.x_pos, robot.y_pos));
+
+            cout << "\nRobot " << robot_count << " ends at coordinates " << robot.x_pos << ", " << robot.y_pos << " heading " << robot.heading << "\n" << endl;
+            
+            robot_count++;
+        }
+
+        cout << "\nRun again? (y/n):" << endl;
         cin >> again;
 
         cout << "\n\n\n";
 
-    } while (again != 'n');
+    } while (again != 'n' && again != 'N');
 
 }
